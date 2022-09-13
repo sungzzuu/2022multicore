@@ -1,29 +1,50 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <chrono>
+#include <vector>
+#include <atomic>
 using namespace std;
+using namespace chrono;
 
-int sum;
+atomic<int> sum;
+constexpr int LOOP = 100000000;
 mutex mylock;
 
-void thread_func()
+void worker(int num_thread)
 {
-	for (auto i = 0; i < 25000000; i++)
+	for (auto i = 0; i < LOOP/ num_thread; i++)
 	{
-		mylock.lock();
-		sum += 2;
-		mylock.unlock();
+		//mylock.lock();
+		sum = sum + 1;
+		//mylock.unlock();
 	}
+
 }
 
 int main()
 {
-	thread t1{ thread_func };
-	thread t2{ thread_func };
 
-	t1.join();
-	t2.join();
+	for (int num_thread = 1; num_thread <= 8; num_thread*=2)
+	{
+		sum = 0;
+		vector<thread> threads;
+		auto t = high_resolution_clock::now();
 
-	// 580만 근처의 값들
-	cout << "Sum = " << sum << '\n';
+		for (int i = 0; i < num_thread; ++i)
+		{
+			threads.emplace_back(worker, num_thread);
+		}
+		for (auto& th : threads)
+			th.join();
+		auto d = high_resolution_clock::now() - t;
+		cout << duration_cast<milliseconds>(d).count() << " msecs ";
+		// 580만 근처의 값들
+		cout << "Threads "<< num_thread <<" Sum = " << sum << '\n';
+
+	}
+
+
+
 }
+ 

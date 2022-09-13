@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+HelloWorld/.vs
+HelloWorld/HelloWorld/x64
+HelloWorld/HelloWorld/Release
+HelloWorld/x64
+HelloWorld/Release
