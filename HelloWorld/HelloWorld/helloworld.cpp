@@ -7,19 +7,24 @@
 using namespace std;
 using namespace chrono;
 
-atomic<int> sum;
-constexpr int LOOP = 100000000;
+int sum;
+constexpr int LOOP = 50000000;
 mutex mylock;
 
 void worker(int num_thread)
 {
+	volatile int local_sum = 0;
 	for (auto i = 0; i < LOOP/ num_thread; i++)
 	{
 		//mylock.lock();
-		sum = sum + 1;
+		//sum = sum + 1; // DATA RACE 일어남.
+		//sum += 1; // data race 일어나지 않음.
+		local_sum += 2;
 		//mylock.unlock();
 	}
-
+	mylock.lock();
+	sum += local_sum;
+	mylock.unlock();
 }
 
 int main()
