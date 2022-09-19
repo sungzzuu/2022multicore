@@ -35,3 +35,17 @@ HelloWorld/HelloWorld/x64
 HelloWorld/HelloWorld/Release
 HelloWorld/x64
 HelloWorld/Release
+*.ipch
+*.tlog
+*.log
+*.recipe
+*.idb
+*.ilk
+*.pdb
+*.iobj
+*.ipdb
+*.db-wal
+*.db-shm
+*.db
+*.opendb
+*.suo
