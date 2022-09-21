@@ -2,6 +2,8 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <atomic>
+
 using namespace std;
 using namespace chrono;
 
@@ -19,8 +21,11 @@ void p_unlock(int _id)
 void p_lock(int _id)
 {
 	int o = 1 - _id;
+
 	flag[_id] = true;
 	victim = _id;
+	atomic_thread_fence(memory_order_seq_cst);
+
 	while (flag[o] && victim == _id)
 	{
 
@@ -31,11 +36,11 @@ void worker(int th_id)
 {
 	for (int i = 0; i < 25000000; i++)
 	{
-		//p_lock(th_id);
-		l.lock();
+		p_lock(th_id);
+		//l.lock();
 		sum = sum + 2;
-		l.unlock();
-		//p_unlock(th_id);
+		//l.unlock();
+		p_unlock(th_id);
 
 		// 피터슨이 성능도 별로고 data race도 일어남.
 		// 이유는??

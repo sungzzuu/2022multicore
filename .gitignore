@@ -49,3 +49,5 @@ HelloWorld/Release
 *.db
 *.opendb
 *.suo
+*.vsidx
+*.lock

@@ -18,5 +18,11 @@
     <ClCompile Include="data.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="0920_15.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="bound.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
