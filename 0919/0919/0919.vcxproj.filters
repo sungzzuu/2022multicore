@@ -15,13 +15,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="data.cpp">
+    <ClCompile Include="peterson.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="0920_15.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="bound.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="peterson_atomic.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
