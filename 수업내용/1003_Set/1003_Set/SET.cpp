@@ -18,12 +18,12 @@ class NODE {
 	mutex	n_lock;
 
 public:
-	int v;
-	NODE* next;
-	bool	marked = false;
+	int				v;
+	NODE* volatile	next;
+	volatile bool	removed; // 실행순서가 바뀌면 안되는 애라서
 
-	NODE() : v(-1), next(nullptr) {}
-	NODE(int x) : v(x), next(nullptr) {}
+	NODE() : v(-1), next(nullptr), removed(false) {}
+	NODE(int x) : v(x), next(nullptr), removed(false) {}
 	void lock()
 	{
 		n_lock.lock();
@@ -432,7 +432,7 @@ public:
 					return false;
 				}
 				else {
-					curr->marked = true;
+					curr->removed = true;
 					prev->next = curr->next;
 					curr->unlock();
 					prev->unlock();
@@ -455,7 +455,7 @@ public:
 			prev = curr;
 			curr = curr->next;
 		}
-		return curr->v == x && !curr->marked;
+		return curr->v == x && !curr->removed;
 	}
 	void print20()
 	{
@@ -481,7 +481,7 @@ public:
 
 	bool validate(NODE* pred, NODE* curr)
 	{
-		return !pred->marked && !curr->marked && pred->next == curr;
+		return !pred->removed && !curr->removed && pred->next == curr;
 	}
 };
 
