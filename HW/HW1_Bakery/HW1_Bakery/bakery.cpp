@@ -3,7 +3,7 @@
 #include <chrono>
 #include <vector>
 #include <mutex>
-constexpr int MAX_THREAD = 8;
+constexpr int MAX_THREAD = 32;
 constexpr int NUM = 10000000;
 
 using namespace std;
