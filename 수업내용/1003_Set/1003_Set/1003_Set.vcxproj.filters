@@ -30,5 +30,8 @@
     <ClCompile Include="Bench_Set.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="HW6_게으른동기화.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
