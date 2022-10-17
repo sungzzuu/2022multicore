@@ -24,17 +24,7 @@ bool CAS(volatile int *addr, int expected, int update)
 void cas_lock()
 {
 	// lock_mem이 1이면 0이 될 때까지 기다린다.
-	while (true)
-	{
-		if (lock_mem == 0) {
-			if (CAS(&lock_mem, 0, 1))
-				return;
-			continue;
-		}
-	}
-
-
-
+	while (!CAS(&lock_mem, 0, 1));
 	// lock_mem이 0이면 atomic하게 1로 바꾸고 리턴한다.
 
 }

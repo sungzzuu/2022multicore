@@ -15,13 +15,11 @@ public:
 };
 
 class NODE {
-	mutex	n_lock;
-
+	mutex n_lock;
 public:
-	int				v;
-	NODE* volatile	next;
-	volatile bool	removed; // 실행순서가 바뀌면 안되는 애라서
-
+	int v;
+	NODE* volatile next;
+	volatile bool removed;
 	NODE() : v(-1), next(nullptr), removed(false) {}
 	NODE(int x) : v(x), next(nullptr), removed(false) {}
 	void lock()
@@ -35,13 +33,11 @@ public:
 };
 
 class NODE_SP {
-	mutex	n_lock;
-
+	mutex n_lock;
 public:
-	int					v;
-	shared_ptr<NODE_SP> next;
-	volatile bool		removed; // 실행순서가 바뀌면 안되는 애라서
-
+	int v;
+	shared_ptr <NODE_SP> next;
+	volatile bool removed;
 	NODE_SP() : v(-1), next(nullptr), removed(false) {}
 	NODE_SP(int x) : v(x), next(nullptr), removed(false) {}
 	void lock()
@@ -54,9 +50,53 @@ public:
 	}
 };
 
+class LF_NODE;
+class LF_PTR {
+	unsigned long long next;
+public:
+	LF_PTR() : next(0) {}
+	LF_PTR(bool marking, LF_NODE* ptr)
+	{
+		next = reinterpret_cast<unsigned long long>(ptr);
+		if (true == marking) next = next | 1;
+	}
+	LF_NODE* get_ptr()
+	{
+		return reinterpret_cast<LF_NODE*>(next & 0xFFFFFFFFFFFFFFFE);
+	}
+	bool get_removed()
+	{
+		return (next & 1) == 1;
+	}
+	LF_NODE* get_ptr_mark(bool* removed)
+	{
+		unsigned long long cur_next = next;
+		*removed = (cur_next & 1) == 1;
+		return reinterpret_cast<LF_NODE*>(cur_next & 0xFFFFFFFFFFFFFFFE);
+	}
+	bool CAS(LF_NODE* o_ptr, LF_NODE* n_ptr, bool o_mark, bool n_mark)
+	{
+		unsigned long long o_next = reinterpret_cast<unsigned long long>(o_ptr);
+		if (true == o_mark) o_next++;
+		unsigned long long n_next = reinterpret_cast<unsigned long long>(n_ptr);
+		if (true == n_mark) n_next++;
+		return atomic_compare_exchange_strong(
+			reinterpret_cast<atomic_uint64_t*>(&next), &o_next, n_next);
+	}
+};
+
+class LF_NODE {
+public:
+	int v;
+	LF_PTR next;
+	LF_NODE() : v(-1), next(false, nullptr) {}
+	LF_NODE(int x) : v(x), next(false, nullptr) {}
+	LF_NODE(int x, LF_NODE* ptr) : v(x), next(false, ptr) {}
+};
+
 class SET {
 	NODE head, tail;
-	mutex ll;
+	null_mutex ll;
 public:
 	SET()
 	{
@@ -259,10 +299,20 @@ public:
 		head.next = &tail;
 		tail.next = nullptr;
 	}
+	bool validate(NODE* prev, NODE* curr)
+	{
+		NODE* n = &head;
+		while (n->v <= prev->v) {
+			if (n == prev)
+				return prev->next == curr;
+			n = n->next;
+		}
+		return false;
+	}
+
 	bool ADD(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			NODE* prev = &head;
 			NODE* curr = prev->next;
 			while (curr->v < x) {
@@ -270,8 +320,7 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
+			if (validate(prev, curr)) {
 				if (curr->v != x) {
 					NODE* node = new NODE{ x };
 					node->next = curr;
@@ -287,17 +336,16 @@ public:
 					return false;
 				}
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-		
 	}
 
 	bool REMOVE(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			NODE* prev = &head;
 			NODE* curr = prev->next;
 			while (curr->v < x) {
@@ -305,32 +353,30 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
+			if (validate(prev, curr)) {
 				if (curr->v != x) {
 					curr->unlock();
 					prev->unlock();
 					return false;
 				}
-				else {
+				else
+				{
 					prev->next = curr->next;
 					curr->unlock();
 					prev->unlock();
-					//delete curr;
 					return true;
 				}
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-	
 	}
 
 	bool CONTAINS(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			NODE* prev = &head;
 			NODE* curr = prev->next;
 			while (curr->v < x) {
@@ -338,20 +384,26 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
-				bool res = (curr->v == x);
+			if (validate(prev, curr)) {
+				if (curr->v == x) {
+					curr->unlock();
+					prev->unlock();
+					return true;
+				}
+				else
+				{
+					curr->unlock();
+					prev->unlock();
+					return false;
+				}
+			}
+			else {
 				curr->unlock();
 				prev->unlock();
-				return res;
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
 		}
-		
-		
 	}
+
 	void print20()
 	{
 		NODE* p = head.next;
@@ -372,18 +424,6 @@ public:
 			delete t;
 		}
 		head.next = &tail;
-	}
-
-	bool validate(NODE* pred, NODE* curr)
-	{
-		NODE* node = &head;
-		while (node->v <= pred->v)
-		{
-			if (node == pred)
-				return pred->next == curr;
-			node = node->next;
-		}
-		return false;
 	}
 };
 
@@ -397,10 +437,15 @@ public:
 		head.next = &tail;
 		tail.next = nullptr;
 	}
+	bool validate(NODE* prev, NODE* curr)
+	{
+		return (prev->removed == false) && (curr->removed == false)
+			&& (prev->next == curr);
+	}
+
 	bool ADD(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			NODE* prev = &head;
 			NODE* curr = prev->next;
 			while (curr->v < x) {
@@ -408,8 +453,7 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
+			if (validate(prev, curr)) {
 				if (curr->v != x) {
 					NODE* node = new NODE{ x };
 					node->next = curr;
@@ -425,17 +469,16 @@ public:
 					return false;
 				}
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-
 	}
 
 	bool REMOVE(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			NODE* prev = &head;
 			NODE* curr = prev->next;
 			while (curr->v < x) {
@@ -443,39 +486,58 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
+			if (validate(prev, curr)) {
 				if (curr->v != x) {
 					curr->unlock();
 					prev->unlock();
 					return false;
 				}
-				else {
+				else
+				{
 					curr->removed = true;
 					prev->next = curr->next;
 					curr->unlock();
 					prev->unlock();
-					//delete curr;
 					return true;
 				}
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-
 	}
 
 	bool CONTAINS(int x)
 	{
-		NODE* prev = &head;
-		NODE* curr = prev->next;
-		while (curr->v < x) {
-			prev = curr;
-			curr = curr->next;
+		while (true) {
+			NODE* prev = &head;
+			NODE* curr = prev->next;
+			while (curr->v < x) {
+				prev = curr;
+				curr = curr->next;
+			}
+			prev->lock(); curr->lock();
+			if (validate(prev, curr)) {
+				if (curr->v == x) {
+					curr->unlock();
+					prev->unlock();
+					return true;
+				}
+				else
+				{
+					curr->unlock();
+					prev->unlock();
+					return false;
+				}
+			}
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-		return curr->v == x && !curr->removed;
 	}
+
 	void print20()
 	{
 		NODE* p = head.next;
@@ -497,27 +559,113 @@ public:
 		}
 		head.next = &tail;
 	}
+};
 
-	bool validate(NODE* pred, NODE* curr)
+class LF_SET {
+	LF_NODE head, tail;
+public:
+	LF_SET()
 	{
-		return !pred->removed && !curr->removed && pred->next == curr;
+		head.v = 0x80000000;
+		tail.v = 0x7FFFFFFF;
+		head.next = LF_PTR{ false, &tail };
+	}
+
+	void Find(LF_NODE*& prev, LF_NODE*& curr, int x)
+	{
+		while (true) {
+		retry:
+			prev = &head;
+			curr = prev->next.get_ptr();
+			while (true) {
+				bool removed;
+				LF_NODE* succ = curr->next.get_ptr_mark(&removed);
+				while (true == removed) {
+					if (false == prev->next.CAS(curr, succ, false, false)) {
+						goto retry;
+					}
+					curr = succ;
+					succ = curr->next.get_ptr_mark(&removed);
+				}
+				if (curr->v >= x) return;
+				prev = curr;
+				curr = succ;
+			}
+		}
+	}
+
+	bool ADD(int x)
+	{
+		while (true) {
+			LF_NODE* prev, * curr;
+			Find(prev, curr, x);
+			if (curr->v != x) {
+				LF_NODE* node = new LF_NODE{ x, curr };
+				if (true == prev->next.CAS(curr, node, false, false))
+					return true;
+				delete node;
+			}
+			else
+			{
+				return false;
+			}
+		}
+	}
+
+	bool REMOVE(int x)
+	{
+		return true;
+	}
+
+	bool CONTAINS(int x)
+	{
+		LF_NODE* node = head.next.get_ptr();
+		//	while (node->v < x) node = node->next;
+			//return ((node->v == x) && (false == node->removed));
+		return true;
+	}
+
+	void print20()
+	{
+		LF_NODE* p = head.next.get_ptr();
+		for (int i = 0; i < 20; ++i) {
+			if (p == &tail) break;
+			cout << p->v << ", ";
+			p = p->next.get_ptr();
+		}
+		cout << endl;
+	}
+
+	void clear()
+	{
+		LF_NODE* p = head.next.get_ptr();
+		while (p != &tail) {
+			LF_NODE* t = p;
+			p = p->next.get_ptr();
+			delete t;
+		}
+		head.next = LF_PTR{ false, &tail };
 	}
 };
 
 class L_SET_SP {
-	shared_ptr<NODE_SP> head, tail;
+	shared_ptr <NODE_SP> head, tail;
 public:
 	L_SET_SP()
 	{
 		head = make_shared<NODE_SP>(0x80000000);
 		tail = make_shared<NODE_SP>(0x7FFFFFFF);
 		head->next = tail;
-		tail->next = nullptr;
 	}
+	bool validate(shared_ptr<NODE_SP>& prev, shared_ptr<NODE_SP>& curr)
+	{
+		return (prev->removed == false) && (curr->removed == false)
+			&& (prev->next == curr);
+	}
+
 	bool ADD(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			shared_ptr<NODE_SP> prev = head;
 			shared_ptr<NODE_SP> curr = prev->next;
 			while (curr->v < x) {
@@ -525,10 +673,9 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
+			if (validate(prev, curr)) {
 				if (curr->v != x) {
-					shared_ptr<NODE_SP> node = make_shared<NODE_SP>(x);
+					shared_ptr<NODE_SP> node = make_shared<NODE_SP>(x);;
 					node->next = curr;
 					prev->next = node;
 					curr->unlock();
@@ -542,17 +689,16 @@ public:
 					return false;
 				}
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-
 	}
 
 	bool REMOVE(int x)
 	{
-		while (true)
-		{
+		while (true) {
 			shared_ptr<NODE_SP> prev = head;
 			shared_ptr<NODE_SP> curr = prev->next;
 			while (curr->v < x) {
@@ -560,14 +706,14 @@ public:
 				curr = curr->next;
 			}
 			prev->lock(); curr->lock();
-			if (validate(prev, curr))
-			{
+			if (validate(prev, curr)) {
 				if (curr->v != x) {
 					curr->unlock();
 					prev->unlock();
 					return false;
 				}
-				else {
+				else
+				{
 					curr->removed = true;
 					prev->next = curr->next;
 					curr->unlock();
@@ -575,20 +721,20 @@ public:
 					return true;
 				}
 			}
-			curr->unlock();
-			prev->unlock();
-			continue;
+			else {
+				curr->unlock();
+				prev->unlock();
+			}
 		}
-
 	}
 
 	bool CONTAINS(int x)
 	{
-		shared_ptr<NODE_SP> p = head->next;
-
-		while (p->v < x) p = p->next;
-		return p->v == x && !p->removed;
+		shared_ptr<NODE_SP> node = head->next;
+		while (node->v < x) node = node->next;
+		return ((node->v == x) && (false == node->removed));
 	}
+
 	void print20()
 	{
 		shared_ptr<NODE_SP> p = head->next;
@@ -604,30 +750,24 @@ public:
 	{
 		head->next = tail;
 	}
-
-	// share_ptr가 함수의 파라미터로 불릴때는 레퍼런스로 호출해야한다.
-	bool validate(shared_ptr<NODE_SP>& pred, shared_ptr<NODE_SP>& curr)
-	{
-		return !pred->removed && !curr->removed && pred->next == curr;
-	}
 };
 
-
-//SET my_set;		// 성긴동기화
-//F_SET my_set;		// 세밀한동기화
-//O_SET my_set;		// 낙천적인동기화
-//L_SET my_set;		// 게으른동기화
-L_SET_SP my_set;	// shared_ptr
+//SET my_set;   // 성긴 동기화
+// F_SET my_set;   // 세밀한 동기화
+//O_SET my_set;	// 낙천적 동기화
+//L_SET my_set;	// 게으른 동기화
+//L_SET_SP my_set; // 게으른 동기화 shared_ptr 구현
+LF_SET my_set;
 
 class HISTORY {
 public:
-	int op; // add. remove, contain 여부
+	int op;
 	int i_value;
 	bool o_value;
 	HISTORY(int o, int i, bool re) : op(o), i_value(i), o_value(re) {}
 };
 
-void worker(vector<HISTORY> *history, int num_threads)
+void worker(vector<HISTORY>* history, int num_threads)
 {
 	for (int i = 0; i < 4000000 / num_threads; ++i) {
 		int op = rand() % 3;
@@ -651,7 +791,6 @@ void worker(vector<HISTORY> *history, int num_threads)
 	}
 }
 
-// add, remove하면서 history 저장
 void worker_check(vector<HISTORY>* history, int num_threads)
 {
 	for (int i = 0; i < 4000000 / num_threads; ++i) {
@@ -676,7 +815,6 @@ void worker_check(vector<HISTORY>* history, int num_threads)
 	}
 }
 
-// 검사하는 부분 - add, remove한 동작을 넣는다.
 void check_history(array <vector <HISTORY>, 16>& history, int num_threads)
 {
 	array <int, 1000> survive = {};
@@ -730,15 +868,15 @@ int main()
 			threads.emplace_back(worker_check, &history[i], num_threads);
 		for (auto& th : threads)
 			th.join();
-		// 검사를 해서 실행속도 오류가 있음.
-
 		auto end_t = high_resolution_clock::now();
 		auto exec_t = end_t - start_t;
 		auto exec_ms = duration_cast<milliseconds>(exec_t).count();
 		my_set.print20();
-		cout << num_threads << "Threads.  Exec Time : " << exec_ms << endl;
+		cout << num_threads << " Threads.  Exec Time : " << exec_ms << endl;
 		check_history(history, num_threads);
 	}
+
+	cout << "======== SPEED CHECK =============\n";
 
 	for (int num_threads = 1; num_threads <= 16; num_threads *= 2) {
 		vector <thread> threads;
@@ -753,7 +891,7 @@ int main()
 		auto exec_t = end_t - start_t;
 		auto exec_ms = duration_cast<milliseconds>(exec_t).count();
 		my_set.print20();
-		cout << num_threads << "Threads.  Exec Time : " << exec_ms << endl;
+		cout << num_threads << " Threads.  Exec Time : " << exec_ms << endl;
 		check_history(history, num_threads);
 	}
 }
