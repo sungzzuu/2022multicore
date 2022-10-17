@@ -620,9 +620,13 @@ public:
 	bool CONTAINS(int x)
 	{
 		LF_NODE* node = head.next.get_ptr();
-		//	while (node->v < x) node = node->next;
-			//return ((node->v == x) && (false == node->removed));
-		return true;
+		bool marked{};
+
+		while (node->v < x) {
+			node->next.get_ptr_mark(&marked);
+			node = node->next.get_ptr();
+		}
+		return ((node->v == x) && (false == marked));
 	}
 
 	void print20()
@@ -801,11 +805,11 @@ void worker_check(vector<HISTORY>* history, int num_threads)
 			history->emplace_back(0, v, my_set.ADD(v));
 			break;
 		}
-		case 1: {
-			int v = rand() % 1000;
-			history->emplace_back(1, v, my_set.REMOVE(v));
-			break;
-		}
+		//case 1: {
+		//	int v = rand() % 1000;
+		//	history->emplace_back(1, v, my_set.REMOVE(v));
+		//	break;
+		//}
 		case 2: {
 			int v = rand() % 1000;
 			history->emplace_back(2, v, my_set.CONTAINS(v));
