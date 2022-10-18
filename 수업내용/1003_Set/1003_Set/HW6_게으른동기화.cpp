@@ -8,6 +8,10 @@
 using namespace std;
 using namespace chrono;
 
+constexpr int RANGE = 10000;
+constexpr int MAX_NUM = 4000000;
+
+
 class null_mutex {
 public:
 	void lock() {}
@@ -163,21 +167,21 @@ public:
 
 void worker(vector<HISTORY> *history, int num_threads)
 {
-	for (int i = 0; i < 4000000 / num_threads; ++i) {
+	for (int i = 0; i < MAX_NUM / num_threads; ++i) {
 		int op = rand() % 3;
 		switch (op) {
 		case 0: {
-			int v = rand() % 1000;
+			int v = rand() % RANGE;
 			my_set.ADD(v);
 			break;
 		}
 		case 1: {
-			int v = rand() % 1000;
+			int v = rand() % RANGE;
 			my_set.REMOVE(v);
 			break;
 		}
 		case 2: {
-			int v = rand() % 1000;
+			int v = rand() % RANGE;
 			my_set.CONTAINS(v);
 			break;
 		}
@@ -188,21 +192,21 @@ void worker(vector<HISTORY> *history, int num_threads)
 // add, remove하면서 history 저장
 void worker_check(vector<HISTORY>* history, int num_threads)
 {
-	for (int i = 0; i < 4000000 / num_threads; ++i) {
+	for (int i = 0; i < MAX_NUM / num_threads; ++i) {
 		int op = rand() % 3;
 		switch (op) {
 		case 0: {
-			int v = rand() % 1000;
+			int v = rand() % RANGE;
 			history->emplace_back(0, v, my_set.ADD(v));
 			break;
 		}
 		case 1: {
-			int v = rand() % 1000;
+			int v = rand() % RANGE;
 			history->emplace_back(1, v, my_set.REMOVE(v));
 			break;
 		}
 		case 2: {
-			int v = rand() % 1000;
+			int v = rand() % RANGE;
 			history->emplace_back(2, v, my_set.CONTAINS(v));
 			break;
 		}
@@ -291,4 +295,5 @@ int main()
 		cout << num_threads << "Threads.  Exec Time : " << exec_ms << endl;
 		check_history(history, num_threads);
 	}
+	system("pause");
 }

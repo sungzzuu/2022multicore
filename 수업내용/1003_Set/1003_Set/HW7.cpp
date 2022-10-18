@@ -796,7 +796,7 @@ public:
 
 void worker(vector<HISTORY>* history, int num_threads)
 {
-	for (int i = 0; i < 4000000 / num_threads; ++i) {
+	for (int i = 0; i < 40000000 / num_threads; ++i) {
 		int op = rand() % 3;
 		switch (op) {
 		case 0: {
@@ -820,7 +820,7 @@ void worker(vector<HISTORY>* history, int num_threads)
 
 void worker_check(vector<HISTORY>* history, int num_threads)
 {
-	for (int i = 0; i < 4000000 / num_threads; ++i) {
+	for (int i = 0; i < 40000000 / num_threads; ++i) {
 		int op = rand() % 3;
 		switch (op) {
 		case 0: {
@@ -921,4 +921,6 @@ int main()
 		cout << num_threads << " Threads.  Exec Time : " << exec_ms << endl;
 		check_history(history, num_threads);
 	}
+
+	system("pause");
 }

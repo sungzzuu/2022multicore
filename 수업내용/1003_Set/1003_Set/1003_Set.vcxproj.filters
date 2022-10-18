@@ -39,5 +39,8 @@
     <ClCompile Include="HW7.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="ebr_SET.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
