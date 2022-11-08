@@ -77,7 +77,7 @@ public:
 			prev = curr;
 			curr = curr->next;
 		}
-		prev->unlock(); curr->unlock();
+		prev->lock(); curr->lock();
 		if (curr->v == x) {
 			prev->next = curr->next;
 			curr->unlock();

@@ -23,7 +23,7 @@ void p_lock(int _id)
 
 	flag[_id] = true;
 	victim = _id;
-	//atomic_thread_fence(memory_order_seq_cst);
+	atomic_thread_fence(memory_order_seq_cst);
 
 	while (flag[o] && victim == _id)
 	{
