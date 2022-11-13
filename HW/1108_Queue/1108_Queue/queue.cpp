@@ -31,10 +31,9 @@ public:
 		n_lock.unlock();
 	}
 };
-
 class C_QUEUE {
-	NODE *head, *tail;
-	null_mutex ll;
+	NODE* head, * tail;
+	mutex ll;
 public:
 	C_QUEUE()
 	{
@@ -49,19 +48,20 @@ public:
 		tail = p;
 		ll.unlock();
 	}
-	void DEQ()
+	int DEQ()
 	{
 		ll.lock();
 		NODE* p = head;
 		if (p->next == nullptr)
 		{
 			ll.unlock();
-			return;
+			return -1;
 		}
+		int value = p->v;
 		head = head->next;
 		delete p;
 		ll.unlock();
-		return;
+		return value;
 	}
 	void print20()
 	{
@@ -84,6 +84,7 @@ public:
 		tail = head;
 	}
 };
+
 class LF_QUEUE {
 	NODE* volatile head, * volatile tail;
 public:
@@ -155,8 +156,8 @@ public:
 	}
 };
 
-//C_QUEUE my_queue;
-LF_QUEUE my_queue;
+C_QUEUE my_queue;
+//LF_QUEUE my_queue;
 void worker(int num_threads)
 {
 	for (int i = 0; i < 10000000 / num_threads; ++i) {
