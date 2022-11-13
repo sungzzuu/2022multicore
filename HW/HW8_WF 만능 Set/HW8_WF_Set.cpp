@@ -10,8 +10,8 @@
 using namespace std;
 using namespace chrono;
 
-static const auto NUM_TEST = 4000;
-static const auto KEY_RANGE = 1000;
+static const auto NUM_TEST = 40000;
+static const auto KEY_RANGE = 10000;
 static const auto MAX_THREAD = 64;
 
 thread_local int thread_id;
@@ -50,7 +50,7 @@ public:
 	~SeqObject() {}
 	Response Apply(const Invocation &invoc)
 	{
-		Response res;
+		Response res = -1;
 		switch (invoc.method) {
 		case M_ADD :
 			if (seq_set.count(invoc.input) != 0) res = false;
@@ -192,7 +192,11 @@ public:
 	NODE* GetMaxNODE() {
 		NODE* max_node = head[0];
 		for (int i = 1; i < MAX_THREAD; i++) {
-			if (max_node->seq < head[i]->seq) max_node = head[i];
+			if (max_node->seq < head[i]->seq)
+			{
+				max_node = head[i];
+				
+			}
 		}
 		return max_node;
 	}
@@ -207,7 +211,10 @@ public:
 		tail = new NODE;
 		tail->seq = 1;
 		for (int i = 0; i < MAX_THREAD; ++i)
+		{
 			head[i] = tail;
+			announce[i] = tail;
+		}
 	}
 
 	WFUniversal()
@@ -233,6 +240,7 @@ public:
 			NODE* before = head[i];
 			NODE* help = announce[((before->seq + 1) % MAX_THREAD)];
 			NODE* prefer;
+
 			if (help->seq == 0) prefer = help;
 			else prefer = announce[i];
 			NODE* after = reinterpret_cast<NODE*>(before->decideNext.decide(reinterpret_cast<int>(prefer)));
@@ -301,6 +309,7 @@ public:
 };
 
 //SeqObject my_set; // 죽는다
+//std::set<int> my_set;
 //MutexUniversal my_set; // 블로킹
 //LFUniversal my_set; 
 WFUniversal my_set; // 2스레드 다음부터 터짐
@@ -327,7 +336,7 @@ int main()
 	vector <thread *> worker_threads;
 	thread_id = 0;
 
-	for (int num_thread = 1; num_thread <= 16; num_thread *= 2)
+	for (int num_thread = 1; num_thread <= 8; num_thread *= 2)
 	{
 		my_set.clear();
 
