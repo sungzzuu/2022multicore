@@ -86,9 +86,9 @@ public:
 	bool CAS(NODE* volatile* next, NODE* old_p, NODE* new_p)
 	{
 		return atomic_compare_exchange_strong(
-			reinterpret_cast<volatile atomic_llong*>(next),
-			reinterpret_cast<long long*>(&old_p),
-			reinterpret_cast<long long>(new_p));
+			reinterpret_cast<volatile atomic_long*>(next),
+			reinterpret_cast<long*>(&old_p),
+			reinterpret_cast<long>(new_p));
 	}
 	void Push(int x)
 	{
@@ -138,9 +138,96 @@ public:
 		}
 	}
 };
-//C_STACK my_stack;
-LF_STACK my_stack;
 
+class BACKOFF {
+	int limit;
+
+public:
+	BACKOFF() : limit(10) {}
+	void backoff()
+	{
+		int delay = rand() % limit + 1; // delay가 0이면 int의 가장 큰 값만큼 딜레이하게 된다.
+		limit = limit * 2;
+		if (limit > 200) limit = 200;
+		_asm mov eax, delay;
+	bo_loop:
+		_asm dec eax;
+		_asm jnz bo_loop;
+	}
+};
+class LF_BO_STACK {
+	NODE* volatile top;
+public:
+	LF_BO_STACK()
+	{
+		top = new NODE{ -1 };
+	}
+	bool CAS(NODE* volatile* next, NODE* old_p, NODE* new_p)
+	{
+		return atomic_compare_exchange_strong(
+			reinterpret_cast<volatile atomic_long*>(next),
+			reinterpret_cast<long*>(&old_p),
+			reinterpret_cast<long>(new_p));
+	}
+	void Push(int x)
+	{
+		NODE* p = new NODE(x);
+		BACKOFF bo;
+		p->next = top;
+		while (true) {
+			NODE* last = top;
+			p->next = last;
+			if (CAS(&top, last, p)) {
+				return;
+			bo.backoff();
+			}
+		}
+	}
+	int Pop()
+	{
+		BACKOFF bo;
+
+		if (top == nullptr)
+		{
+			return -2;
+		}
+		while (true)
+		{
+			NODE* last = top;
+			NODE* next = last->next;
+			if (CAS(&top, last, next))
+			{
+				int value = last->v;
+				return value;
+			}
+			bo.backoff();
+
+		}
+	}
+	void print20()
+	{
+		NODE* p = top;
+		for (int i = 0; i < 20; ++i) {
+			if (p == nullptr) break;
+			cout << p->v << ", ";
+			p = p->next;
+		}
+		cout << endl;
+	}
+
+	void clear()
+	{
+		while (top != nullptr) {
+			NODE* t = top;
+			top = top->next;
+			delete t;
+		}
+	}
+};
+
+//C_STACK my_stack;
+//LF_STACK my_stack;
+LF_BO_STACK my_stack;
 void worker(int num_threads)
 {
 	for (int i = 0; i < NUM_TEST / num_threads; ++i) {
